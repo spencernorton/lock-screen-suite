@@ -6,19 +6,19 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/spencercnorton/norvi-os"><img alt="Part of NorviOS" src="https://img.shields.io/badge/NorviOS-component-FD8024.svg"></a>
-  <a href="https://github.com/spencercnorton/lock-screen-suite/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/spencercnorton/lock-screen-suite/actions/workflows/ci.yml/badge.svg"></a>
-  <a href="https://github.com/spencercnorton/lock-screen-suite/tags"><img alt="Latest release" src="https://img.shields.io/github/v/tag/spencercnorton/lock-screen-suite?label=release&sort=semver"></a>
+  <a href="https://github.com/spencernorton/norvi-os"><img alt="Part of NorviOS" src="https://img.shields.io/badge/NorviOS-component-FD8024.svg"></a>
+  <a href="https://github.com/spencernorton/lock-screen-suite/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/spencernorton/lock-screen-suite/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/spencernorton/lock-screen-suite/tags"><img alt="Latest release" src="https://img.shields.io/github/v/tag/spencercnorton/lock-screen-suite?label=release&sort=semver"></a>
   <a href="#install"><img alt="Install for GNOME Shell" src="https://img.shields.io/badge/install-GNOME%20Shell-4a86cf.svg"></a>
   <a href="LICENSE"><img alt="Licence" src="https://img.shields.io/badge/licence-GPL--3.0--or--later-blue.svg"></a>
   <a href="https://buy.stripe.com/8x26oH2U44f65TRe574wM04"><img alt="Donate" src="https://img.shields.io/badge/donate-Stripe-635bff.svg?logo=stripe&logoColor=white"></a>
 </p>
 
 <p align="center">
-  <img alt="The NorviOS lock screen: a large clock with seconds, the date, and the current weather over a softened wallpaper." src="https://raw.githubusercontent.com/spencercnorton/norvi-os/main/docs/screenshots/lock-screen.png" width="700">
+  <img alt="The NorviOS lock screen: a large clock with seconds, the date, and the current weather over a softened wallpaper." src="https://raw.githubusercontent.com/spencernorton/norvi-os/main/docs/screenshots/lock-screen.png" width="700">
 </p>
 
-The screenshot is the [NorviOS](https://github.com/spencercnorton/norvi-os) lock screen on a fresh Ubuntu 26.04 virtual machine with a demo account and a generated wallpaper.
+The screenshot is the [NorviOS](https://github.com/spencernorton/norvi-os) lock screen on a fresh Ubuntu 26.04 virtual machine with a demo account and a generated wallpaper.
 
 Lock Screen Suite restyles GNOME Shell's unlock dialog without replacing it: GNOME still owns the lock itself, the password prompt and the notifications. It supports GNOME Shell 48, 49 and 50.
 
@@ -36,7 +36,7 @@ Lock Screen Suite restyles GNOME Shell's unlock dialog without replacing it: GNO
 
 ### GNOME Shell — the release zip
 
-Download `lock-screen-suite.shell-extension.zip` and `SHA256SUMS.txt` from the [latest release](https://github.com/spencercnorton/lock-screen-suite/releases/latest), then:
+Download `lock-screen-suite.shell-extension.zip` and `SHA256SUMS.txt` from the [latest release](https://github.com/spencernorton/lock-screen-suite/releases/latest), then:
 
 ```bash
 sha256sum --check --ignore-missing SHA256SUMS.txt
@@ -69,8 +69,8 @@ The only network requests are the forecast for your chosen coordinates, and the 
 
 ## Contributing and support
 
-- Bugs and feature requests: [open an issue](https://github.com/spencercnorton/lock-screen-suite/issues/new/choose). Questions: [Discussions](https://github.com/spencercnorton/lock-screen-suite/discussions).
-- Security reports: [private vulnerability reporting](https://github.com/spencercnorton/lock-screen-suite/security/advisories/new). See [SECURITY.md](SECURITY.md). There is no e-mail address; that is deliberate.
+- Bugs and feature requests: [open an issue](https://github.com/spencernorton/lock-screen-suite/issues/new/choose). Questions: [Discussions](https://github.com/spencernorton/lock-screen-suite/discussions).
+- Security reports: [private vulnerability reporting](https://github.com/spencernorton/lock-screen-suite/security/advisories/new). See [SECURITY.md](SECURITY.md). There is no e-mail address; that is deliberate.
 - Pull requests are welcome; read [CONTRIBUTING.md](CONTRIBUTING.md) first. Changes are reviewed and merged on GitHub, then shipped in tagged releases.
 - If this saves you time, you can [support its development](https://buy.stripe.com/8x26oH2U44f65TRe574wM04).
 
