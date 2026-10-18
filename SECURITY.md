@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Please report vulnerabilities privately through GitHub:
-**[Report a vulnerability](https://github.com/spencercnorton/lock-screen-suite/security/advisories/new)**.
+**[Report a vulnerability](https://github.com/spencernorton/lock-screen-suite/security/advisories/new)**.
 Do not open a public issue, and do not include real credentials, your location or
 personal paths in the report — a description and a minimal reproduction are enough.
 
