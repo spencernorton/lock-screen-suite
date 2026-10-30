@@ -8,17 +8,15 @@
 <p align="center">
   <a href="https://github.com/spencernorton/norvi-os"><img alt="Part of NorviOS" src="https://img.shields.io/badge/NorviOS-component-FD8024.svg"></a>
   <a href="https://github.com/spencernorton/lock-screen-suite/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/spencernorton/lock-screen-suite/actions/workflows/ci.yml/badge.svg"></a>
-  <a href="https://github.com/spencernorton/lock-screen-suite/tags"><img alt="Latest release" src="https://img.shields.io/github/v/tag/spencercnorton/lock-screen-suite?label=release&sort=semver"></a>
+  <a href="https://github.com/spencernorton/lock-screen-suite/tags"><img alt="Latest release" src="https://img.shields.io/github/v/tag/spencernorton/lock-screen-suite?label=release&sort=semver"></a>
   <a href="#install"><img alt="Install for GNOME Shell" src="https://img.shields.io/badge/install-GNOME%20Shell-4a86cf.svg"></a>
   <a href="LICENSE"><img alt="Licence" src="https://img.shields.io/badge/licence-GPL--3.0--or--later-blue.svg"></a>
   <a href="https://buy.stripe.com/8x26oH2U44f65TRe574wM04"><img alt="Donate" src="https://img.shields.io/badge/donate-Stripe-635bff.svg?logo=stripe&logoColor=white"></a>
 </p>
 
-<p align="center">
-  <img alt="The NorviOS lock screen: a large clock with seconds, the date, and the current weather over a softened wallpaper." src="https://raw.githubusercontent.com/spencernorton/norvi-os/main/docs/screenshots/lock-screen.png" width="700">
-</p>
+<p align="center"><picture><source media="(prefers-reduced-motion: reduce)" srcset="docs/demos/lock-screen-still.png"><img src="docs/demos/lock-screen.gif" alt="Watch the lock screen’s seconds update over the softened demonstration wallpaper." width="900"></picture></p>
 
-The screenshot is the [NorviOS](https://github.com/spencernorton/norvi-os) lock screen on a fresh Ubuntu 26.04 virtual machine with a demo account and a generated wallpaper.
+The real GNOME lock dialog in an isolated session, with a generated wallpaper and weather disabled. [Recording source and still image](docs/demos/README.md).
 
 Lock Screen Suite restyles GNOME Shell's unlock dialog without replacing it: GNOME still owns the lock itself, the password prompt and the notifications. It supports GNOME Shell 48, 49 and 50.
 
