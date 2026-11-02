@@ -2,6 +2,10 @@
 
 All notable changes to Lock Screen Suite are documented here.
 
+## 2.2.1 — 2026-11-02
+
+Republishes 2.2.0 with a fresh, verifiable build: the archive's importer proves every package against its release run's build artifact, and 2.2.0's expired after 14 days before it was imported. No functional change to the extension; adds a test that drives the packaged extension in a real GNOME Shell and a demo recording.
+
 ## 2.2.0 — 2026-10-15
 
 - The atmosphere moves in with the clock. Instead of a full-screen layer on every monitor, the weather now lives in a bounded stage around the clock cluster on the primary monitor, and the cluster itself is an invisible box in the scene: rain splashes on its roof, rolls to a corner, and drips off; snow settles on the roof and melts; clouds and their shadows drift behind and above it; fog gathers at its base; lightning lights the stage rather than the whole room. Sky placement (stars, moon, glow, clouds) is now sampled inside the stage's own rectangle. Other monitors keep the graded wallpaper only.
