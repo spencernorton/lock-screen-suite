@@ -1,3 +1,10 @@
+gnome-shell-extension-lock-screen-suite (2.2.1) resolute; urgency=medium
+
+  * Rebuild 2.2.0 so the release carries a build artifact the archive can
+    still verify. No functional change.
+
+ -- Norvi <apt@globalentry.systems>  Mon, 02 Nov 2026 17:00:00 +0000
+
 gnome-shell-extension-lock-screen-suite (2.2.0) resolute; urgency=medium
 
   * Move the weather atmosphere into a bounded stage around the clock on
