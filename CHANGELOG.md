@@ -2,6 +2,12 @@
 
 All notable changes to Lock Screen Suite are documented here.
 
+## 2.2.2 — 2026-11-27
+
+- Activate weather polling timers only while an unlock dialog is live and instantiate `Soup.Session` lazily only when a network request is needed.
+- Prefer a fresh optional shared desktop weather snapshot on disk when coordinates match before issuing an Open-Meteo request.
+- Skip atmosphere stage setup and sky-mask decoding unless weather atmosphere or nighttime grading needs them, decode sky masks asynchronously with teardown cancellation, clear `skyCache` on disable, and stay inert when `GNOME_SHELL_DEV_HARNESS=1`.
+
 ## 2.2.1 — 2026-11-02
 
 Republishes 2.2.0 with a fresh, verifiable build: the archive's importer proves every package against its release run's build artifact, and 2.2.0's expired after 14 days before it was imported. No functional change to the extension; adds a test that drives the packaged extension in a real GNOME Shell and a demo recording.

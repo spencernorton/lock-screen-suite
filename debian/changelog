@@ -1,3 +1,13 @@
+gnome-shell-extension-lock-screen-suite (2.2.2) resolute; urgency=medium
+
+  * Run weather polling only while an unlock dialog is active and create
+    Soup.Session lazily.
+  * Reuse a fresh optional shared desktop weather snapshot when present.
+  * Gate atmosphere construction and decode sky masks asynchronously with
+    cancellation, clear skyCache on disable, and honor dev-harness mode.
+
+ -- Norvi <apt@globalentry.systems>  Fri, 27 Nov 2026 21:15:00 +0000
+
 gnome-shell-extension-lock-screen-suite (2.2.1) resolute; urgency=medium
 
   * Rebuild 2.2.0 so the release carries a build artifact the archive can
