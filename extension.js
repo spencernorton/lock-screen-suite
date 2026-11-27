@@ -4,12 +4,15 @@
 //   enable()  → load settings, install UnlockDialog patches, hook live dialog if any.
 //   disable() → uninstall patches, restore live dialog if any.
 
+import GLib from 'gi://GLib';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
 import {LockScreenCustomizer} from './lockScreen.js';
 
 export default class LockScreenSuiteExtension extends Extension {
     enable() {
+        if (GLib.getenv('GNOME_SHELL_DEV_HARNESS') === '1')
+            return;
         this._settings = this.getSettings();
         this._customizer = new LockScreenCustomizer({
             settings: this._settings,

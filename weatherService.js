@@ -12,11 +12,19 @@ import Gio from 'gi://Gio';
 import Soup from 'gi://Soup?version=3.0';
 
 const USER_AGENT = 'gnome-lock-screen-suite/1';
+const SHARED_WEATHER_CACHE = GLib.build_filenamev([
+    GLib.get_user_cache_dir(),
+    'norvi-weather',
+    'current.json',
+]);
 
 export class WeatherService {
     constructor(settings) {
         this._settings = settings;
-        this._session = new Soup.Session({user_agent: USER_AGENT, timeout: 15});
+        // Created lazily only when a network fallback fetch is actually needed
+        // (while locked and no fresh shared weather cache exists on disk).
+        this._session = null;
+        this._active = false;
         this._subscribers = new Set();
         this._timeoutId = 0;
         this._inFlight = null;
@@ -28,11 +36,36 @@ export class WeatherService {
             this._settings.connect('changed::weather-longitude', () => this._refreshSoon()),
             this._settings.connect('changed::weather-units', () => this._refreshSoon()),
         ];
+    }
 
-        this._reschedule();
+    setActive(active) {
+        const next = Boolean(active);
+        if (next === this._active)
+            return;
+        this._active = next;
+        if (next) {
+            this._reschedule();
+            this.requestRefresh({ifStale: true});
+        } else {
+            if (this._timeoutId) {
+                GLib.source_remove(this._timeoutId);
+                this._timeoutId = 0;
+            }
+            if (this._soonId) {
+                GLib.source_remove(this._soonId);
+                this._soonId = 0;
+            }
+        }
+    }
+
+    _ensureSession() {
+        if (!this._session)
+            this._session = new Soup.Session({user_agent: USER_AGENT, timeout: 15});
+        return this._session;
     }
 
     destroy() {
+        this._active = false;
         if (this._timeoutId) {
             GLib.source_remove(this._timeoutId);
             this._timeoutId = 0;
@@ -45,8 +78,9 @@ export class WeatherService {
             this._settings.disconnect(id);
         this._settingsHandlers = [];
         try {
-            this._session.abort();
+            this._session?.abort();
         } catch {}
+        this._session = null;
         this._subscribers.clear();
     }
 
@@ -62,7 +96,55 @@ export class WeatherService {
         return () => this._subscribers.delete(callback);
     }
 
+    _readSharedWeatherCache() {
+        try {
+            if (this._coordinatesUnset())
+                return null;
+            const [ok, bytes] = GLib.file_get_contents(SHARED_WEATHER_CACHE);
+            if (!ok)
+                return null;
+            const snap = JSON.parse(new TextDecoder().decode(bytes));
+            if (!snap || !Number.isFinite(snap.fetchedAt) ||
+                !Number.isFinite(snap.lat) || !Number.isFinite(snap.lon))
+                return null;
+            const lat = this._settings.get_double('weather-latitude');
+            const lon = this._settings.get_double('weather-longitude');
+            if (Math.abs(snap.lat - lat) > 0.02 || Math.abs(snap.lon - lon) > 0.02)
+                return null;
+            const periodSec = Math.max(20, this._settings.get_int('weather-refresh-minutes')) * 60;
+            const age = Math.floor(Date.now() / 1000) - Number(snap.fetchedAt);
+            if (age < 0 || age > periodSec)
+                return null;
+            const units = this._settings.get_string('weather-units');
+            const metric = units === 'metric';
+            const fToUnit = v => Number.isFinite(v) ? (metric ? (v - 32) * 5 / 9 : v) : undefined;
+            const mphToUnit = v => Number.isFinite(v) ? (metric ? v * 1.609344 : v) : undefined;
+            return {
+                fetchedAt: Number(snap.fetchedAt),
+                place: `${lat.toFixed(4)},${lon.toFixed(4)},${units}`,
+                tempUnit: metric ? '°C' : '°F',
+                windUnit: metric ? 'kmh' : 'mph',
+                temperature: fToUnit(snap.temperatureF),
+                apparent: fToUnit(snap.apparentF),
+                humidity: snap.humidity,
+                isDay: Boolean(snap.isDay),
+                weatherCode: snap.weatherCode,
+                windSpeed: mphToUnit(snap.windSpeedMph),
+                windDirection: snap.windDirection,
+                cloudCover: snap.cloudCover,
+                precipitation: snap.precipitationMm ?? 0,
+                tempMax: fToUnit(snap.tempMaxF),
+                tempMin: fToUnit(snap.tempMinF),
+            };
+        } catch {
+            return null;
+        }
+    }
+
     getCachedPayload() {
+        const shared = this._readSharedWeatherCache();
+        if (shared)
+            return shared;
         const raw = this._settings.get_string('weather-last-payload');
         if (!raw) return null;
         try { return JSON.parse(raw); } catch { return null; }
@@ -81,11 +163,12 @@ export class WeatherService {
             GLib.source_remove(this._timeoutId);
             this._timeoutId = 0;
         }
-        if (!this._settings.get_boolean('weather-enabled'))
+        if (!this._active || !this._settings.get_boolean('weather-enabled'))
             return;
 
         const periodMin = Math.max(5, this._settings.get_int('weather-refresh-minutes'));
-        const lastFetch = this._settings.get_int64('weather-last-fetch');
+        const cached = this.getCachedPayload();
+        const lastFetch = cached?.fetchedAt ?? Number(this._settings.get_int64('weather-last-fetch'));
         const nowSec = Math.floor(Date.now() / 1000);
         const elapsed = nowSec - Number(lastFetch);
         const periodSec = periodMin * 60;
@@ -95,13 +178,13 @@ export class WeatherService {
             GLib.PRIORITY_LOW,
             initialDelay,
             () => {
-                this.requestRefresh();
+                this.requestRefresh({ifStale: true});
                 // Re-schedule for the regular interval after the first kick.
                 this._timeoutId = GLib.timeout_add_seconds(
                     GLib.PRIORITY_LOW,
                     periodSec,
                     () => {
-                        this.requestRefresh();
+                        this.requestRefresh({ifStale: true});
                         return GLib.SOURCE_CONTINUE;
                     }
                 );
@@ -116,6 +199,8 @@ export class WeatherService {
     // forecast's place and units: a real change fetches, while preferences
     // writing back a coordinate rounded to its four displayed decimals does not.
     _refreshSoon() {
+        if (!this._active)
+            return;
         if (this._soonId)
             GLib.source_remove(this._soonId);
         this._soonId = GLib.timeout_add(GLib.PRIORITY_LOW, 500, () => {
@@ -126,14 +211,18 @@ export class WeatherService {
     }
 
     /**
-     * Fetch the current weather. With `ifStale`, a cached forecast for the
-     * same place and units that is younger than the refresh interval is
-     * enough: the lock screen rebuilds its widgets on every lock, and each
-     * rebuild must not cost a request.
+     * Fetch the current weather. Prefers an optional shared desktop weather
+     * snapshot on disk so locking avoids a duplicate Open-Meteo request when
+     * another desktop weather provider already refreshed within the interval.
      */
     requestRefresh({ifStale = false} = {}) {
         if (!this._settings.get_boolean('weather-enabled'))
             return;
+        const shared = this._readSharedWeatherCache();
+        if (shared) {
+            this._emit(shared);
+            return;
+        }
         if (ifStale && this._isFresh())
             return;
         if (this._inFlight) {
@@ -223,8 +312,9 @@ export class WeatherService {
             `https://api.open-meteo.com/v1/forecast?${params.join('&')}`;
 
         const message = Soup.Message.new('GET', url);
+        const session = this._ensureSession();
         const bytes = await new Promise((resolve, reject) => {
-            this._session.send_and_read_async(
+            session.send_and_read_async(
                 message,
                 GLib.PRIORITY_LOW,
                 null,
