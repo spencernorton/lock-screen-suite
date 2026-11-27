@@ -28,7 +28,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {LockClockWidget} from './clockWidget.js';
 import {WeatherWidget} from './weatherWidget.js';
 import {WeatherService} from './weatherService.js';
-import {AtmosphereGroup, conditionGrade} from './atmosphere.js';
+import {AtmosphereGroup, clearSkyCache, conditionGrade} from './atmosphere.js';
 
 // Marker we attach to St.Widgets we create, so we can tell ours from upstream's
 // when iterating background children.
@@ -137,6 +137,7 @@ export class LockScreenCustomizer {
 
         this._weatherService?.destroy();
         this._weatherService = null;
+        clearSkyCache();
     }
 
     // ---- background construction ----
@@ -283,6 +284,7 @@ export class LockScreenCustomizer {
             return;
         dialog._lssCustomized = true;
         this._liveDialogs.add(dialog);
+        this._weatherService?.setActive(true);
 
         const clockBox = dialog._clock;
         if (!clockBox)
@@ -338,11 +340,11 @@ export class LockScreenCustomizer {
         dialog._lssAtmosphere = atmosphere;
         clockBox.connectObject('notify::allocation', () => {
             atmosphere.syncClockBox();
-        }, dialog);
+        }, atmosphere);
         Main.layoutManager.connectObject('monitors-changed', () => {
             atmosphere.rebuild(Main.layoutManager.monitors,
                 Main.layoutManager.primaryIndex);
-        }, dialog);
+        }, atmosphere);
 
         // Style the surrounding box so our cluster reads as one block.
         clockBox.add_style_class_name('lss-cluster');
@@ -352,6 +354,8 @@ export class LockScreenCustomizer {
         // actor on disable.
         const destroyId = dialog.connect('destroy', () => {
             this._liveDialogs.delete(dialog);
+            if (this._liveDialogs.size === 0)
+                this._weatherService?.setActive(false);
         });
         dialog._lssDestroyId = destroyId;
     }

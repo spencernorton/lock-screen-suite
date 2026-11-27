@@ -259,6 +259,101 @@ function makeMoon(size, phase = moonPhase()) {
 const MASK_W_PER_MONITOR = 384;
 const skyCache = new Map();
 
+export function clearSkyCache() {
+    skyCache.clear();
+}
+
+function loadPixbufAtScaleAsync(file, width, height, cancellable) {
+    return new Promise((resolve, reject) => {
+        file.read_async(GLib.PRIORITY_LOW, cancellable, (src, res) => {
+            let stream;
+            try {
+                stream = src.read_finish(res);
+            } catch (e) {
+                reject(e);
+                return;
+            }
+            GdkPixbuf.Pixbuf.new_from_stream_at_scale_async(
+                stream, width, height, false, cancellable, (_ps, pRes) => {
+                    try {
+                        resolve(GdkPixbuf.Pixbuf.new_from_stream_finish(pRes));
+                    } catch (e) {
+                        reject(e);
+                    } finally {
+                        stream.close_async(GLib.PRIORITY_LOW, null, null);
+                    }
+                });
+        });
+    });
+}
+
+async function computeSkyAsync(monitors, fileForMonitor, fallbackFile, cancellable) {
+    const key = monitors.map((m, i) =>
+        `${m.x},${m.y},${m.width}x${m.height}:${fileCacheKey(fileForMonitor(i) ?? fallbackFile)}`).join('|');
+    if (skyCache.has(key))
+        return skyCache.get(key);
+
+    let fallbackPixbuf = null;
+    let fallbackTried = false;
+    const loadFallback = async () => {
+        if (fallbackTried || !fallbackFile?.get_path())
+            return fallbackPixbuf;
+        fallbackTried = true;
+        const totalW = Math.max(...monitors.map(m => m.x + m.width));
+        const totalH = Math.max(...monitors.map(m => m.y + m.height));
+        const scale = MASK_W_PER_MONITOR / Math.max(...monitors.map(m => m.width));
+        try {
+            fallbackPixbuf = await loadPixbufAtScaleAsync(
+                fallbackFile, Math.round(totalW * scale), Math.round(totalH * scale), cancellable);
+        } catch {
+            fallbackPixbuf = null;
+        }
+        return fallbackPixbuf;
+    };
+
+    const skies = [];
+    for (let i = 0; i < monitors.length; i++) {
+        if (cancellable?.is_cancelled())
+            return null;
+        const monitor = monitors[i];
+        const scale = MASK_W_PER_MONITOR / monitor.width;
+        const mw = MASK_W_PER_MONITOR, mh = Math.max(24, Math.round(monitor.height * scale));
+        const custom = fileForMonitor(i);
+        try {
+            if (custom?.get_path()) {
+                const pb = await loadPixbufAtScaleAsync(custom, mw, mh, cancellable);
+                skies.push(pixbufSky(pb, monitor));
+                continue;
+            }
+            const full = await loadFallback();
+            if (full) {
+                const fs = MASK_W_PER_MONITOR / Math.max(...monitors.map(m => m.width));
+                const crop = full.new_subpixbuf(
+                    Math.round(monitor.x * fs), Math.round(monitor.y * fs),
+                    Math.max(1, Math.round(monitor.width * fs)),
+                    Math.max(1, Math.round(monitor.height * fs)));
+                const sub = (crop.get_width() === mw && crop.get_height() === mh)
+                    ? crop
+                    : crop.scale_simple(mw, mh, GdkPixbuf.InterpType.BILINEAR);
+                skies.push(pixbufSky(sub, monitor));
+                continue;
+            }
+        } catch (e) {
+            if (cancellable?.is_cancelled())
+                return null;
+            console.warn(`[lock-screen-suite] sky detection failed for monitor ${i}: ${e}`);
+        }
+        skies.push(new MonitorSky(monitor, null, 0, 0));
+    }
+
+    if (cancellable?.is_cancelled())
+        return null;
+    skyCache.set(key, skies);
+    if (skyCache.size > 4)
+        skyCache.delete(skyCache.keys().next().value);
+    return skies;
+}
+
 function fileCacheKey(file) {
     if (!file)
         return 'none';
@@ -483,6 +578,7 @@ class AtmosphereGroup extends Clutter.Actor {
         this._sceneKey = null;
         this._layers = [];
         this._skyIdleId = 0;
+        this._skyCancellable = null;
         this._clockBox = null;
         this._clockBoxDirty = false;
         this._promptProgress = 0;
@@ -494,16 +590,24 @@ class AtmosphereGroup extends Clutter.Actor {
             this._sceneKey = null;
             this._rebuildScene();
         };
+        const rebuildEnabled = () => {
+            this._buildLayers();
+            this._scheduleSky();
+            this._sceneKey = null;
+            this._rebuildScene();
+        };
         this._settingsHandlers = [
-            [this._settings, this._settings.connect('changed::weather-atmosphere', rebuild)],
+            [this._settings, this._settings.connect('changed::weather-atmosphere', rebuildEnabled)],
             [this._settings, this._settings.connect('changed::weather-show-animation', rebuildAnimated)],
             [this._settings, this._settings.connect('changed::weather-atmosphere-density', rebuild)],
             [this._settings, this._settings.connect('changed::weather-lightning', rebuild)],
-            [this._settings, this._settings.connect('changed::weather-enabled', rebuild)],
+            [this._settings, this._settings.connect('changed::weather-enabled', rebuildEnabled)],
+            [this._settings, this._settings.connect('changed::weather-grading', () => this._scheduleSky())],
             [this._interfaceSettings, this._interfaceSettings.connect('changed::enable-animations', rebuildAnimated)],
         ];
         this._unsubscribe = service?.subscribe(p => {
             this._payload = p;
+            this._scheduleSky();
             this._rebuildScene();
             this._onGradeDirty?.();
         });
@@ -516,11 +620,28 @@ class AtmosphereGroup extends Clutter.Actor {
             if (this._skyIdleId)
                 GLib.source_remove(this._skyIdleId);
             this._skyIdleId = 0;
+            this._skyCancellable?.cancel();
+            this._skyCancellable = null;
+            this._timeline?._lssDispose?.();
+            this._timeline = null;
             try { this._unsubscribe?.(); } catch {}
             for (const [obj, id] of this._settingsHandlers.splice(0)) {
                 try { obj.disconnect(id); } catch {}
             }
         });
+    }
+
+    _atmosphereEnabled() {
+        return this._settings.get_boolean('weather-enabled') &&
+            this._settings.get_boolean('weather-atmosphere') &&
+            (this._service?.hasPlace() ?? false);
+    }
+
+    _needsSky() {
+        if (this._atmosphereEnabled())
+            return true;
+        return this._settings.get_boolean('weather-grading') &&
+            this._payload?.isDay === false;
     }
 
     _animate() {
@@ -606,6 +727,8 @@ class AtmosphereGroup extends Clutter.Actor {
         this._timeline = null;
         this.destroy_all_children();
         this._layers = [];
+        if (!this._atmosphereEnabled())
+            return;
         const index = this._primaryIndex();
         const monitor = index >= 0 ? this._monitors[index] : null;
         if (!monitor)
@@ -629,19 +752,31 @@ class AtmosphereGroup extends Clutter.Actor {
     }
 
     _scheduleSky() {
+        if (!this._needsSky())
+            return;
+        if (this._skies)
+            return;
         if (this._skyIdleId)
             GLib.source_remove(this._skyIdleId);
+        this._skyCancellable?.cancel();
         this._skyIdleId = GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
             this._skyIdleId = 0;
-            try {
-                this._skies = computeSky(this._monitors, this._fileForMonitor, this._fallbackFile);
-            } catch (e) {
-                console.warn(`[lock-screen-suite] sky detection failed: ${e}`);
-                this._skies = null;
-            }
-            this._sceneKey = null;
-            this._rebuildScene();
-            this._onGradeDirty?.();
+            const cancellable = new Gio.Cancellable();
+            this._skyCancellable = cancellable;
+            computeSkyAsync(this._monitors, this._fileForMonitor, this._fallbackFile, cancellable)
+                .then(skies => {
+                    if (cancellable.is_cancelled() || this._skyCancellable !== cancellable)
+                        return;
+                    this._skyCancellable = null;
+                    this._skies = skies;
+                    this._sceneKey = null;
+                    this._rebuildScene();
+                    this._onGradeDirty?.();
+                })
+                .catch(e => {
+                    if (!cancellable.is_cancelled())
+                        console.warn(`[lock-screen-suite] sky detection failed: ${e}`);
+                });
             return GLib.SOURCE_REMOVE;
         });
     }
